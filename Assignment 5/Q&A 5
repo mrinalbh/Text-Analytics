@@ -1,0 +1,104 @@
+For the below questions, submit two separate answers: (1) MS Word file that answers all the questions, and (2) R code file that you used to answer the questions. The MS Word file and R code file should be submitted in the same format of previous weeks’ assignments.
+____________________________________________________________________________
+For this assignment, use the dataset named “Data-Papers-En.zip”. The data contains English abstracts of research papers published in various journals. All questions should be answered with concise codes (i.e., no redundant codes or outputs). Ideally, the code should NOT produce unnecessary outputs that I do not ask. Include codes and outputs as screenshots below each question to present correct answers. 
+
+Note: Please do NOT REMOVE the questions. Insert answers below each question. 
+
+Q1) Create a corpus with the data in the data folder (3 pts)
+library("tm")
+my.text.location <- "C:/Users/mrina/OneDrive/Documents/Text/Assignments/A6/Data-Papers-En/"
+newpapers <- VCorpus(DirSource(my.text.location))
+
+Q2) How many documents exist in the data folder (3 pts)
+length(newpapers)
+ 
+Q3) Present all file names in the data folder (3 pts)
+unlist(meta(newpapers,tag='id'))
+ 
+Q4) Call and present the first and second abstract from the data folder. (Note: Read the two abstracts carefully to understand the context of the papers that you will analyze) (3 pts)
+newpapers[[1]]$content
+newpapers[[2]]$content
+ 
+
+Q5) Make a function to check the terms that contain punctuations (e.g., and/or, blue-collar, ICD-9, K-pop, i.e., e.g., face-to-face etc.). And then, present those (a) terms that contain punctuations and (b) their frequencies in a two-column data frame.  (10 pts)
+library("stringr")
+punctterms <- function(x){str_extract_all(x, "[[:alnum:]]{1,}[[:punct:]]{1,}?[[:alnum:]]{1,}")}
+terms <- lapply(newpapers, punctterms)
+m <- as.data.frame(table(unlist(terms)))
+names(m) <- c("Terms", "Frequency")
+m
+ 
+
+Q6) Make a function to check all numeric expressions that appear in the corpus. And then, present (a) the numeric expressions and (b) their frequencies in a two-column data frame.   (10 pts)
+numterms <- function(x){str_extract_all(x, "[[:digit:]]{1,}")}
+nums <- lapply(newpapers, numterms)
+n <- as.data.frame(table(unlist(nums)))
+names(n) <- c("Numbers", "Frequency")
+n
+ 
+
+
+Q7) Remove all punctuations from the corpus. And then, by using the function that you created for Q5, check if any punctuation still exists in the corpus. (6 pts)
+newpapers1 <- tm_map(newpapers, content_transformer(function(x){gsub('[[:punct:]]+','',x)}))
+my.check.func <- function(x){str_extract_all(x, "[[:punct:]]")}
+my.check1 <- lapply(newpapers1, my.check.func)
+p <- as.data.frame(table(unlist(my.check1)))
+p
+ 
+Q8) Remove all numbers from the corpus. And then, by using the function that you created for Q6, check if any numeric expression still exists in the corpus (6 pts).
+newpapers1 <- tm_map(newpapers1, removeNumbers)
+num.check.func <- function(x){str_extract_all(x, "[[:digit:]]{1,}]]")}
+my.check2 <- lapply(newpapers1, num.check.func)
+d <- as.data.frame(table(unlist(my.check2)))
+d
+ 
+
+Q9) Remove all white spaces, change all characters into lower-case, apply stoplist(“smart”), and perform stemming (5 pts). 
+newpapers1 <- tm_map(newpapers1, stripWhitespace)
+newpapers1 <- tm_map(newpapers1, content_transformer(tolower))
+newpapers1 <- tm_map(newpapers1, removeWords, words=stopwords("SMART"))
+newpapers1 <- tm_map(newpapers1, stemDocument, language="en")
+
+Q10) Read the contents of the 1st and 24th abstracts from the preprocessed corpus. (4 pts)
+newpapers1[[1]]$content
+newpapers1[[24]]$content
+ 
+Q11) Create a Document-Term-Matrix by applying the Term-Frequency-Inverse-Document-Frequency weighting algorithm. From the produced matrix, round the Term-Frequency-Inverse-Document-Frequency values to two decimal digits. Present a snippet of the processed Document-Term-Matrix. (10 pts)
+ptm.tfidf <- DocumentTermMatrix(newpapers1, control=list(weighting=function(x){weightTfIdf(x, normalize=FALSE)}))
+r <- round(ptm.tfidf, 2)
+inspect(r)
+ 
+
+Q12) Draw a Hierarchical Cluster Dendrogram that shows the clusters of documents. (17pts)
+     To draw the dendrogram, please follow the below requirements:
+     (a) Remove sparse terms that have more than 80% of 0s. 
+     (b) Documents names should be transformed into the format of "pYYYYa" by removing
+          the first character and the file extensions (i.e., .txt) at the end. For example,
+          the original file name, "p2015c.txt", should be transformed to "2015c". 
+r <- removeSparseTerms(r, sparse = 0.80)
+title <-  str_extract_all(meta(newpapers, tag = "id"), "[[:digit:]]+[[:alpha:]]")
+rownames(r) <- title
+distance <- dist(r, method="euclidian")
+hc <- hclust(distance, method="complete")
+plot(hc, main='Data Papers Dendrogram')
+ 
+
+Q13) Now, group the corpus into 6 clusters of documents and draw a dendrogram. The dendrogram should  represent each cluster with different color. (20 pts)
+Note 1: To learn how to create 6 clusters from the corpus, refer to: https://stat.ethz.ch/R-manual/R-devel/library/stats/html/cutree.html 
+Note 2: To color each dendrogram with different color, you need to install 'dendextend' pakcage.
+Note 3: To learn the way to use the 'dendextend' package, refer to: http://www.sthda.com/english/wiki/beautiful-dendrogram-visualizations-in-r-5-must-known-methods-unsupervised-machine-learning#dendextend-package-extending-rs-dendrogram-functionality 
+library("dendextend")
+hcd = as.dendrogram(hc)
+labelColors = c("red", "green", "blue", "yellow", "grey", "pink")
+clusMember <- cutree(hc, 6)
+colLab <- function(n) {
+  if (is.leaf(n)) {
+    a <- attributes(n)
+    labCol <- labelColors[clusMember[which(names(clusMember) == a$label)]]
+    attr(n, "nodePar") <- c(a$nodePar, lab.col = labCol)
+  }
+  n
+}
+clusDendro = dendrapply(hcd, colLab)
+plot(clusDendro, main='Data Papers Dendrogram')
+ 
